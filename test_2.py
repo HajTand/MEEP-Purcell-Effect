@@ -5,8 +5,8 @@ import numpy as np
 import meep as mp
 
 "количество микселей на микрометров"
-"размер ячейки 5 нм = 1/200"
-resolution = 200  # pixels/μm
+"размер ячейки 14.28 нм = 1/70"
+resolution = 70  # pixels/μm
 "показатель преломления среды"
 n = 2.4
 "диэлектрическая проницаемость среды"
@@ -26,36 +26,41 @@ dpml = 1.0
 df = 0.2 * dipole_vac_freq
 nfreq = 1
 
-
 # расчет без зеркал, просто однородная среда
 
-"L - размер среды"
-L = 10.0
+"размер среды"
+L = 10.0   # размер среды по Z
+R = 5.0    # радиус среды по R
 "sz - размер рабочей области целого вместе с pml"
-sz = L + 2.0 * dpml
-cell_size = mp.Vector3(z=sz)
+sz_L = L + 2.0 * dpml
+sz_R = R + dpml
+cell_size = mp.Vector3(sz_R,0,sz_L)
 "размер ячейки"
 pml_layers = [mp.PML(dpml)]
 "количество слоев pml"
 
 "задаем источник и его параметры, центр геометрический"
 "ширины df источник"
+"центр ставим на r = 1.5/resolution (рекомендация Meep)"
+source_point = mp.Vector3(1.5 / resolution, 0, 0)
 sources = [ 
     mp.Source(
         mp.GaussianSource(dipole_vac_freq, fwidth=df),
-        component=mp.Ex,
-        center=mp.Vector3(z=0),
+        component=mp.Er,
+        center=source_point,
     )
 ]
 
 "задаем симуляцию, dim - размерность моделирования"
 "размер ячейки - cell_size, исчтоник - sources, разрешение - resolution"
 "boundary layers - граничные слои"
+"m=-1 - азимутальное число для диполя с поляризацией || зеркалам"
 sim = mp.Simulation(
     cell_size=cell_size,
     boundary_layers=pml_layers,
     sources=sources,
-    dimensions=1,
+    dimensions=mp.CYLINDRICAL, #"цилиндрическая симметрия (2D расчет)"
+    m = -1,
     resolution=resolution,
     default_material=mp.Medium(index=n)
 )
@@ -75,27 +80,31 @@ f_P = []
 Norm_Thickness = np.arange(0.2,3.2,0.2)
 
 for value in Norm_Thickness:
-    sz = ((value * dipole_vac_wavelen) / n)
-    cell_size = mp.Vector3(z = sz)
+    sz_L = ((value * dipole_vac_wavelen) / n)
+    sz_R = R + dpml
+    cell_size = mp.Vector3(sz_R,0,sz_L)
+    "PML ТОЛЬКО по радиусу! По Z границы = PEC зеркала"
+    pml_layers = [mp.PML(dpml, direction=mp.R)]
     sources = [ 
         mp.Source(
             mp.GaussianSource(dipole_vac_freq, fwidth=df),
-            component=mp.Ex,
-            center=mp.Vector3(z=0),
+            component=mp.Er,
+            center=source_point,
         )
     ]
     
     sim = mp.Simulation(
        cell_size=cell_size,
        sources=sources,
-       dimensions=1,
+       boundary_layers=pml_layers,
+       dimensions=mp.CYLINDRICAL,
+       m = -1,
        resolution=resolution,
        default_material=mp.Medium(index=n)
        )
-       # boundary_layers НЕТ! потому что границы = PEC зеркала
     
     sim.run(mp.dft_ldos(dipole_vac_freq, df, nfreq),
-            until_after_sources=1000)
+            until_after_sources=5)
 
     ldos_res = sim.ldos_data[0]
     f_P.append(ldos_res/ldos_bulk)
@@ -116,9 +125,9 @@ def purcell_theory(x):
 purcell_theory_vals = [purcell_theory(x) for x in Norm_Thickness] 
    
 print()
-plt.plot(Norm_Thickness,f_P)
-plt.plot(Norm_Thickness,purcell_theory_vals)
-
-print(ldos_bulk)
+plt.plot(Norm_Thickness,f_P,'o-',label = "рассчет")
+plt.plot(Norm_Thickness,purcell_theory_vals,'o-',label = 'теория')
+plt.legend()
+plt.show()
 
 
