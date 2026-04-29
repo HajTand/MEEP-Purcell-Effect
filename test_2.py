@@ -67,8 +67,9 @@ sim.run(mp.dft_ldos(dipole_vac_freq, df, nfreq),
         until_after_sources=mp.stop_when_fields_decayed(50, mp.Ex, mp.Vector3(), 1e-9))
 
 ldos_bulk = sim.ldos_data[0]
-print(f"LDOS_bulk = {ldos_bulk:.6f}")
+
 sim.reset_meep()
+
 # рассчет с резонатором
 f_P = []
 Norm_Thickness = np.arange(0.2,3.2,0.2)
@@ -94,7 +95,7 @@ for value in Norm_Thickness:
        # boundary_layers НЕТ! потому что границы = PEC зеркала
     
     sim.run(mp.dft_ldos(dipole_vac_freq, df, nfreq),
-            until_after_sources=10000)
+            until_after_sources=1000)
 
     ldos_res = sim.ldos_data[0]
     f_P.append(ldos_res/ldos_bulk)
